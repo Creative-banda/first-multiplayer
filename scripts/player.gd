@@ -14,6 +14,7 @@ const DECELERATION = 5.0
 @onready var camera_pivot = $CameraPivot
 @onready var camera = $CameraPivot/SpringArm3D/Camera3D
 @onready var anim_tree = $AnimationTree
+@export var networked_velocity := Vector3.ZERO
 
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 var last_position = Vector3.ZERO
@@ -33,31 +34,26 @@ func _ready():
 	anim_tree.active = true 
 
 func _process(delta):
-	# --- ANIMATION SYNC LOGIC ---
-	var world_displacement = position - last_position
-	var world_velocity = world_displacement / delta
+	# --- 1. SYNC THE VELOCITY ---
+	# If I am the owner, I update the network variable.
+	# If I am the client, the network variable updates me!
+	if is_multiplayer_authority():
+		networked_velocity = velocity
 	
-	# Convert to Local Space (relative to where player is looking)
+	# Use the networked version for animation (it works for everyone)
+	var world_velocity = networked_velocity 
+
+	# --- 2. CALCULATE ANIMATION ---
 	var local_velocity = transform.basis.inverse() * world_velocity
 	
-	# --- DYNAMIC NORMALIZATION (The Fix for -1 / 1) ---
-	var blend_x = 0.0
+	var blend_x = local_velocity.x / WALK_SPEED
 	var blend_z = 0.0
 	
-	# 1. Handle Strafe (X Axis)
-	# We divide by WALK_SPEED so that walking speed (2.0) becomes 1.0 in the graph
-	blend_x = local_velocity.x / WALK_SPEED
-	
-	# 2. Handle Forward/Backward (Z Axis)
 	if local_velocity.z < 0: 
-		# Moving Forward (Negative Z) -> Divide by RUN_SPEED to allow Walking (0.3) vs Running (1.0)
 		blend_z = local_velocity.z / RUN_SPEED
 	else:
-		# Moving Backward (Positive Z) -> Divide by WALK_SPEED so it reaches full intensity (1.0)
 		blend_z = local_velocity.z / WALK_SPEED
 		
-	# Combine (Flip Z if your Forward is Up in the graph)
-	# Assuming Up in Graph = Forward (-Z in math)
 	var anim_blend = Vector2(blend_x, -blend_z)
 	
 	# Smooth it out
