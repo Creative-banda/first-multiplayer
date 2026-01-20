@@ -110,12 +110,39 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.21686, -0.109732)
 [node name="Walls" type="Node3D" parent="."]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Walls"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.415, 2.86462, 0)
+transform = Transform3D(0.114868, 0, 0.993381, 0, 1, 0, -0.993381, 0, 0.114868, 16.1977, 2.86462, -6.56615)
 mesh = SubResource("BoxMesh_tlwt5")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="Walls/MeshInstance3D"]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/MeshInstance3D/StaticBody3D"]
+shape = SubResource("ConvexPolygonShape3D_tlwt5")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(-5.02103e-09, -0.114868, 0.993381, 1, -4.37114e-08, 0, 4.34221e-08, 0.993381, 0.114868, 15.6665, 0.88363, -1.97259)
+mesh = SubResource("BoxMesh_tlwt5")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Walls/MeshInstance3D2"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/MeshInstance3D2/StaticBody3D"]
+shape = SubResource("ConvexPolygonShape3D_tlwt5")
+
+[node name="MeshInstance3D3" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(-5.02103e-09, -0.114868, 0.993381, 1, -4.37114e-08, 0, 4.34221e-08, 0.993381, 0.114868, 15.1836, 1.86752, 2.20429)
+mesh = SubResource("BoxMesh_tlwt5")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Walls/MeshInstance3D3"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/MeshInstance3D3/StaticBody3D"]
+shape = SubResource("ConvexPolygonShape3D_tlwt5")
+
+[node name="MeshInstance3D4" type="MeshInstance3D" parent="Walls"]
+transform = Transform3D(-5.02103e-09, -0.114868, 0.993381, 1, -4.37114e-08, 0, 4.34221e-08, 0.993381, 0.114868, 14.706, 2.90834, 6.33445)
+mesh = SubResource("BoxMesh_tlwt5")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Walls/MeshInstance3D4"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/MeshInstance3D4/StaticBody3D"]
 shape = SubResource("ConvexPolygonShape3D_tlwt5")
 
 [connection signal="pressed" from="UI/Host" to="." method="_on_host_pressed"]
