@@ -5,7 +5,7 @@ const WALK_SPEED = 2.0
 const RUN_SPEED = 6.0
 const CROUCH_SPEED = 1.0 
 const JUMP_VELOCITY = 4.5
-const MOUSE_SENSITIVITY = 0.006
+const MOUSE_SENSITIVITY = 0.003
 const CAMERA_LAG_SPEED = 7.0  # <--- NEW: Controls how smooth the camera follows (Lower = Smoother)
 
 const ACCELERATION = 10.0 
@@ -34,6 +34,7 @@ const WEAPON_RIFLE = 1
 @export var sync_is_grounded := true
 @export var sync_is_jumping := false
 @export var sync_is_crouching := false 
+@export var sync_is_sprinting := false
 
 # --- INPUT VARIABLES ---
 @export var is_armed := false # For switching weapons
@@ -72,9 +73,12 @@ func _process(delta):
 		networked_velocity = velocity
 		# Sync the rotation from the SpringArm (Up/Down)
 		sync_cam_x_rot = spring_arm.rotation.x
+		# Determine if we are sprinting (Authority only)
+		sync_is_sprinting = Input.is_action_pressed("sprint") and velocity.length() > 0.1
 	else:
 		# Apply the rotation to the Puppet's SpringArm so IK updates
 		spring_arm.rotation.x = lerp_angle(spring_arm.rotation.x, sync_cam_x_rot, 15 * delta)	
+	
 	var world_velocity = networked_velocity 
 
 	# --- 2. SET THE WEAPON ---
@@ -82,51 +86,39 @@ func _process(delta):
 	anim_tree.set("parameters/MainState/conditions/no_weapon", not is_armed)
 	anim_tree.set("parameters/MainState/conditions/is_falling", (not sync_is_grounded and not sync_is_jumping))
 	
-	# --- 3. MOVEMENT BLEND (Existing code) ---
+	# --- 3. MOVEMENT BLEND & IK CONTROL ---
 	var local_velocity = transform.basis.inverse() * world_velocity
 	
-	# ======================================================
-	# NEW: IK CONTROL (Disable aiming while moving)
-	# ======================================================
-	
-	# 1. Decide: Are we moving? (Check length of velocity)
+	# === IK CONTROL (Disable aiming while moving) ===
 	var is_moving = local_velocity.length() > 0.1
-	
-	# 2. Set Target: If moving -> 0.0 (Off). If still -> 0.7 (On).
+	# If moving -> 0.0 (Off). If still -> 0.7 (On).
 	var target_influence = 0.0 if is_moving else 0.7
-	
-	# 3. Smooth Transition: Prevent snapping by using move_toward
 	spine_ik.interpolation = move_toward(spine_ik.interpolation, target_influence, 5.0 * delta)
 	
+	# === BLEND CALCULATION (The Fix) ===
+	# We divide by RUN_SPEED (Global Max) so the values scale correctly:
+	# Walking (5m/s) / RunSpeed (10m/s) = 0.5 (Half animation)
+	# Running (10m/s) / RunSpeed (10m/s) = 1.0 (Full animation)
+	var blend_x = local_velocity.x / RUN_SPEED
+	var blend_z = local_velocity.z / RUN_SPEED
 	
-	var current_max_speed = WALK_SPEED
-	if sync_is_crouching:
-		current_max_speed = CROUCH_SPEED 
-	elif local_velocity.z < 0 and abs(local_velocity.z) > WALK_SPEED:
-		current_max_speed = RUN_SPEED
-
-	var blend_x = local_velocity.x / current_max_speed
-	var blend_z = local_velocity.z / current_max_speed
-	
-	# This is your TARGET blend (Where we want to go)
 	var target_blend_vector = Vector2(blend_x, -blend_z)
+	var lerp_speed = 8.0 * delta 
 	
 	# 3A. Update Normal Movement
 	var current_blend_pos = anim_tree.get("parameters/MainState/Movement/blend_position")
 	if current_blend_pos != null:
-		# Lerp TOWARDS the target, not towards the old value
-		anim_tree.set("parameters/MainState/Movement/blend_position", current_blend_pos.lerp(target_blend_vector, 10 * delta))
+		anim_tree.set("parameters/MainState/Movement/blend_position", current_blend_pos.lerp(target_blend_vector, lerp_speed))
 		
-	# 3B. Update Pistol Movement (Use the SAME target vector)
-	# Note: We get the current pistol position to lerp smoothly
+	# 3B. Update Pistol Movement
 	var current_pistol_pos = anim_tree.get("parameters/MainState/Pistol_Movement/blend_position")
 	if current_pistol_pos != null:
-		anim_tree.set("parameters/MainState/Pistol_Movement/blend_position", current_pistol_pos.lerp(target_blend_vector, 10 * delta))
+		anim_tree.set("parameters/MainState/Pistol_Movement/blend_position", current_pistol_pos.lerp(target_blend_vector, lerp_speed))
 
 	# 3C. Update Crouch Movement
 	var current_crouch_pos = anim_tree.get("parameters/MainState/Crouch_Movement/blend_position")
 	if current_crouch_pos != null:
-		anim_tree.set("parameters/MainState/Crouch_Movement/blend_position", current_crouch_pos.lerp(target_blend_vector, 10 * delta))
+		anim_tree.set("parameters/MainState/Crouch_Movement/blend_position", current_crouch_pos.lerp(target_blend_vector, lerp_speed))
 	
 	# --- 4. UPDATE CONDITIONS ---
 	anim_tree.set("parameters/MainState/conditions/is_grounded", sync_is_grounded)
@@ -139,6 +131,7 @@ func _process(delta):
 	var new_height = move_toward(collision_shape.shape.height, target_h, 5.0 * delta)
 	collision_shape.shape.height = new_height
 	collision_shape.position.y = new_height / 2.0
+	
 
 func _unhandled_input(event):
 	if not is_multiplayer_authority(): return
